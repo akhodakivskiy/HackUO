@@ -10,10 +10,13 @@ Not sure where this project is going tho...
 
 Compiling:
 
+```
 $ sbt stage
+```
 
 Usage:
 
+```
 $ ./target/universal/stage/bin/hack-uo --help
   --host <value>           server host name
   --port <value>           server port
@@ -28,3 +31,4 @@ $ ./target/universal/stage/bin/hack-uo --help
   --client-flag <value>    client flag indicating uo version: (t2a, renaissance, third dawn, lbr, aos, se, sa, uo3d, reserved, 3d)
   --login-count <value>    login count (defaults to 0)
   --encrypted              OSI server encryption on
+  ```
