@@ -75,13 +75,17 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
       pm.setCrypto(new GameCrypto(authId))
     }
 
-    val loginHandler: LoginHandler = LoginHandler(config.clientFlag, config.loginCount)
-    val loginState: LoginState = LoginState(config.username, config.password, clientIp, serverIp, serverPort, authId, config.clientVersion, serverName, config.characterName)
-    val world: World = World(login = loginState, loginHandlerOpt = Some(loginHandler))
+    val loginState: LoginState = LoginState(config.username, config.password,
+      clientIp, serverIp, serverPort, authId, config.clientVersion, serverName, config.characterName,
+      config.clientFlag, config.loginCount)
+
+    val world: World = World(login = loginState)
+
+    val handler: MultiHandler = MultiHandler(MovementHandler :: ItemHandler :: ContainerHandler :: MobileHandler :: LoginHandler :: InteractionHandler :: REPLHandler :: Nil)
 
     startReadingPackets(pm)
 
-    startProcessingPackets(pm, world)
+    startProcessingPackets(pm, world, handler)
 
     val authIdBuffer: ByteBuffer = ByteBuffer.allocate(4)
     authIdBuffer.putInt(authId)
@@ -91,17 +95,7 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
 
     while (!socket.isClosed) {
       val command: String = StdIn.readLine("> ")
-
-      command.split(" ").toList.filter(_.nonEmpty) match {
-        case Nil =>
-        case ("exit" | "quit") :: Nil => socket.close()
-        case "logpackets" :: BooleanValue(value) ::  Nil => pm.setLogPackets(value)
-        case "walk" :: IntValue(dx) :: IntValue(dy) :: Nil => messageQueue.put(StartMoveHandlerMessage(dx, dy, isRunning = false, 0))
-        case "run" :: IntValue(dx) :: IntValue(dy) :: Nil => messageQueue.put(StartMoveHandlerMessage(dx, dy, isRunning = true, 0))
-        case "syncpos" :: Nil => messageQueue.put(SyncMoveHandlerMessage)
-        case _ => Console.println(s"unrecognized command")
-      }
-
+      messageQueue.put(REPLMessage(command.split(" ").filter(_.nonEmpty).toList))
     }
 
     socket.close()
@@ -111,6 +105,8 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
     response match {
       case PacketResponse(packet) => packetManager.send(packet)
       case MultiResponse(responses) => responses.foreach(r => handleResponse(r, packetManager))
+      case MessageResponse(message) => messageQueue.put(message)
+      case LogResponse(text) => logger.info(text)
       case TerminateResponse(reason) =>
         logger.info(s"terminating due to: $reason")
         System.exit(0)
@@ -118,7 +114,7 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
     }
   }
 
-  def startProcessingPackets(packetManager: PacketManager, worldInit: World): Unit = {
+  def startProcessingPackets(packetManager: PacketManager, worldInit: World, handler: Handler): Unit = {
     ExecutionContext.Implicits.global.execute(new Runnable {
       private var world: World = worldInit
       private var continue: Boolean = true
@@ -127,7 +123,7 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
         while (continue) {
           val message: Message = messageQueue.take()
 
-          val (newWorld, response) = world.handler.handle(message).run(world).value
+          val (newWorld, response) = handler.handle(message).run(world).value
 
           handleResponse(response, packetManager)
 

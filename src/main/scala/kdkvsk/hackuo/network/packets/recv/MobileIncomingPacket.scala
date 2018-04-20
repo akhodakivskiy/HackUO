@@ -1,16 +1,16 @@
 package kdkvsk.hackuo.network.packets.recv
 
-import java.io.{BufferedInputStream, DataInputStream}
+import java.io.DataInputStream
 
-import kdkvsk.hackuo.model.common.{Direction, Serial}
 import kdkvsk.hackuo.model.Notoriety
+import kdkvsk.hackuo.model.common.{BodyId, Direction, GraphicId, Serial}
 import kdkvsk.hackuo.network.{RecvPacket, RecvPacketParser}
 
 import scala.collection.mutable
 
-case class MobileIncomingItem(serial: Serial, itemId: Short, layer: Byte, hue: Short)
+case class MobileIncomingItem(serial: Serial, graphicId: GraphicId, layer: Byte, hue: Short)
 
-case class MobileIncomingPacket(serial: Serial, body: Short, x: Short, y: Short, z: Short, facing: Byte,
+case class MobileIncomingPacket(serial: Serial, bodyId: BodyId, x: Short, y: Short, z: Short, facing: Byte,
                                 hue: Short, flags: Byte, notorietyByte: Byte,
                                 items: Seq[MobileIncomingItem]) extends RecvPacket {
   def id: Int = MobileIncomingPacketParser.packetId
@@ -27,7 +27,7 @@ object MobileIncomingPacketParser extends RecvPacketParser {
     ensureLength(data, size)
 
     val serial: Serial = Serial(data.readInt())
-    val body: Short = data.readShort()
+    val bodyId: BodyId = BodyId(data.readShort())
     val x: Short = data.readShort()
     val y: Short = data.readShort()
     val z: Byte = data.readByte()
@@ -51,7 +51,7 @@ object MobileIncomingPacketParser extends RecvPacketParser {
         val layer: Byte = data.readByte()
         val itemHue: Short = data.readShort()
 
-        items.append(MobileIncomingItem(itemSerial, itemGraphic, layer, itemHue))
+        items.append(MobileIncomingItem(itemSerial, GraphicId(itemGraphic), layer, itemHue))
       }
     }
 
@@ -59,6 +59,6 @@ object MobileIncomingPacketParser extends RecvPacketParser {
       throw new IllegalStateException(s"unexpected end of packet")
     }
 
-    MobileIncomingPacket(serial, body, x, y, z, facing, hue, statusFlag, notoriety, items.toVector)
+    MobileIncomingPacket(serial, bodyId, x, y, z, facing, hue, statusFlag, notoriety, items.toVector)
   }
 }

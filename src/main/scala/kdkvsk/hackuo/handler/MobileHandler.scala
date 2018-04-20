@@ -1,7 +1,8 @@
 package kdkvsk.hackuo.handler
 import com.typesafe.scalalogging.LazyLogging
+import kdkvsk.hackuo.{Message, PacketMessage}
 import kdkvsk.hackuo.model._
-import kdkvsk.hackuo.model.common.ItemLayer
+import kdkvsk.hackuo.model.common.{ItemLayer, Serial}
 import kdkvsk.hackuo.network.packets.recv._
 import kdkvsk.hackuo.network.packets.recvsend.{GiSetMapPacket, WarModePacket}
 
@@ -13,6 +14,7 @@ object MobileHandler extends Handler with MobileHandlerOps {
     case PacketMessage(p: MobileStatusPacket) => mobileStatus(p)
     case PacketMessage(p: WarModePacket) => warMode(p)
     case PacketMessage(p: DeletePacket) => deleteMobile(p)
+    case PacketMessage(p: ItemRevisionHashPacket) => itemRevision(p)
   }
 }
 
@@ -20,27 +22,27 @@ trait MobileHandlerOps extends LazyLogging {
   def loginConfirm(p: LoginConfirmPacket): World.State = World.modify { w =>
     w.copy(
       playerSerial = p.serial,
-      mobiles = w.mobiles.updated(p.serial, Mobile(p.serial, p.bodyId, 0, p.x, p.y, p.z, flags = 0, p.direction)))
+      mobiles = w.mobiles.updated(p.serial, Mobile(p.serial, p.typeId, 0, p.x, p.y, p.z, flags = 0, p.direction)))
   }
 
   def drawPlayer(p: DrawPlayerPacket): World.State = World.modify { w =>
     val mobile: Mobile = w.mobiles
-      .getOrElse(p.serial, Mobile(p.serial, p.body, p.hue, p.x, p.y, p.z, p.flags, p.direction))
-      .copy(body = p.body, hue = p.hue, x = p.x, y = p.y, z = p.z, direction = p.direction)
+      .getOrElse(p.serial, Mobile(p.serial, p.bodyId, p.hue, p.x, p.y, p.z, p.flags, p.direction))
+      .copy(bodyId = p.bodyId, hue = p.hue, x = p.x, y = p.y, z = p.z, direction = p.direction)
 
     w.copy(mobiles = w.mobiles.updated(mobile.serial, mobile))
   }
 
   def mobileIncoming(p: MobileIncomingPacket): World.State = World.modify { w =>
-    val items: Seq[MobileItem] = p.items.map { i =>
-      MobileItem(i.serial, i.itemId, ItemLayer(i.layer), i.hue)
-    }
+    val items: Map[Serial, MobileItem] = p.items.map { i =>
+      i.serial -> MobileItem(i.serial, i.graphicId, ItemLayer(i.layer), i.hue, 0)
+    }.toMap
 
     val mobile: Mobile = w.mobiles
-      .getOrElse(p.serial, Mobile(p.serial, p.body, p.hue, p.x, p.y, p.z, p.flags, p.direction))
-      .copy(body = p.body, hue = p.hue, x = p.x, y = p.y, z = p.z, direction = p.direction, notoriety = p.notoriety, items = items)
+      .getOrElse(p.serial, Mobile(p.serial, p.bodyId, p.hue, p.x, p.y, p.z, p.flags, p.direction))
+      .copy(bodyId = p.bodyId, hue = p.hue, x = p.x, y = p.y, z = p.z, direction = p.direction, notoriety = p.notoriety, items = items)
 
-    w.copy(mobiles = w.mobiles.updated(mobile.serial, mobile))
+    w.copy(mobiles = w.mobiles.updated(mobile.serial, mobile), item2mobile = w.item2mobile ++ p.items.map(i => i.serial -> mobile.serial))
   }
 
   def mobileStatus(p: MobileStatusPacket): World.State = World.modify { w =>
@@ -89,7 +91,7 @@ trait MobileHandlerOps extends LazyLogging {
   def updatePlayer(p: UpdatePlayerPacket): World.State = World.modify { w =>
     w.mobiles.get(p.serial) match {
       case Some(mobile) =>
-        val newMobile = mobile.copy(body = p.body, x = p.x, y = p.y, z = p.z, direction = p.direction, hue = p.hue, flags = p.flags)
+        val newMobile = mobile.copy(bodyId = p.bodyId, x = p.x, y = p.y, z = p.z, direction = p.direction, hue = p.hue, flags = p.flags)
         w.copy(mobiles = w.mobiles.updated(p.serial, newMobile))
       case None =>
         logger.warn(s"mobile ${p.serial} not found for ${p.getClass.getSimpleName} update")
@@ -98,6 +100,21 @@ trait MobileHandlerOps extends LazyLogging {
   }
 
   def deleteMobile(p: DeletePacket): World.State = World.modify { w =>
-    w.copy(mobiles = w.mobiles - p.serial)
+    w.mobiles.get(p.serial) match {
+      case Some(m) => w.copy(mobiles = w.mobiles - p.serial, item2mobile = w.item2mobile -- m.items.keys)
+      case None => w
+    }
+  }
+
+  def itemRevision(p: ItemRevisionHashPacket): World.State = World.modify { w =>
+    val worldOpt: Option[World] = for {
+      mid <- w.item2mobile.get(p.serial)
+      mobile <- w.mobiles.get(mid)
+      item <- mobile.items.get(p.serial)
+    } yield {
+      w.copy(mobiles = w.mobiles.updated(mid, mobile.copy(items = mobile.items.updated(item.serial, item.copy(itemHash = p.itemHash)))))
+    }
+
+    worldOpt.getOrElse(w)
   }
 }

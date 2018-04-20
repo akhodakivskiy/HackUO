@@ -2,14 +2,14 @@ package kdkvsk.hackuo.network.packets.recv
 
 import java.io.DataInputStream
 
-import kdkvsk.hackuo.model.common.{Direction, Serial}
+import kdkvsk.hackuo.model.common.{Direction, GraphicId, Serial}
 import kdkvsk.hackuo.network.{RecvPacket, RecvPacketParser}
 
-case class MultiInfoPacket(serial: Serial, itemId: Short, x: Short, y: Short, z: Byte) extends RecvPacket {
+case class MultiInfoPacket(serial: Serial, graphicId: GraphicId, x: Short, y: Short, z: Byte) extends RecvPacket {
   def id: Int = ItemInfoPacketParser.packetId
 }
 
-case class ItemInfoPacket(serial: Serial, itemId: Short, amount: Short, x: Short, y: Short, z: Byte, layer: Byte, hue: Short, facing: Byte, flag: Byte) extends RecvPacket {
+case class ItemInfoPacket(serial: Serial, typeId: GraphicId, amount: Short, x: Short, y: Short, z: Byte, layer: Byte, hue: Short, facing: Byte, flag: Byte) extends RecvPacket {
   def id: Int = ItemInfoPacketParser.packetId
 
   def direction: Direction.Type = Direction.fromByte(facing)
@@ -22,7 +22,7 @@ object ItemInfoPacketParser extends RecvPacketParser {
     data.skipBytes(2)
     val dataType: Byte = data.readByte
     val serial: Serial = Serial(data.readInt())
-    val itemId: Short = data.readShort()
+    val graphicId: GraphicId = GraphicId(data.readShort())
     val facing: Byte = data.readByte()
     val amount: Short = data.readShort()
     val _: Short = data.readShort()
@@ -34,9 +34,9 @@ object ItemInfoPacketParser extends RecvPacketParser {
     val flag: Byte = data.readByte()
 
     if (dataType == 0x0) {
-      ItemInfoPacket(serial, itemId, amount, x, y, z, layer, hue, facing, flag)
+      ItemInfoPacket(serial, graphicId, amount, x, y, z, layer, hue, facing, flag)
     } else {
-      MultiInfoPacket(serial, itemId, x, y, z)
+      MultiInfoPacket(serial, graphicId, x, y, z)
     }
 
   }

@@ -1,6 +1,6 @@
-package kdkvsk.hackuo.handler
+package kdkvsk.hackuo
 
-import kdkvsk.hackuo.network.{RecvPacket, SendPacket}
+import kdkvsk.hackuo.network.RecvPacket
 
 sealed trait Message
 

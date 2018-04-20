@@ -23,7 +23,7 @@ object MessageUnicodePacketParser extends RecvPacketParser with LazyLogging {
     val font: Short = data.readShort()
     val language: String = readStringWithNull(data, 4)
     val name: String = readStringWithNull(data, 30)
-    val text: String = readUnicode(data, size - 48 - 2)
+    val text: String = readUTF16BE(data, size - 48 - 2)
     val nullPlug: Short = data.readShort()
 
     if (nullPlug != 0) {

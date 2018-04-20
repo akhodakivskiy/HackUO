@@ -2,7 +2,16 @@ package kdkvsk.hackuo.lib
 
 object IntValue {
   def unapply(value: String): Option[Int] = {
-    try { Some(value.toInt) } catch { case _: NumberFormatException => None }
+    try {
+      Some(value.toInt)
+    } catch {
+      case _: NumberFormatException =>
+        try {
+          Some(new java.math.BigInteger(value.stripPrefix("0x"), 16).intValue())
+        } catch {
+          case _: NumberFormatException => None
+        }
+    }
   }
 }
 

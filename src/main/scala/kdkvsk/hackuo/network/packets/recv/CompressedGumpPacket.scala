@@ -40,31 +40,32 @@ object CompressedGumpPacketParser extends RecvPacketParser {
     val gumpData: String = new String(ddata, 0, dlen - 1, StandardCharsets.US_ASCII)
 
     val numTextLines: Int = data.readInt()
-    val clenTxt: Int = data.readInt()
-    val dlenTxt: Int = data.readInt()
-    val cdataTxt: Array[Byte] = new Array[Byte](clenTxt - 4)
-    if (data.read(cdataTxt) != clenTxt - 4) {
-      throw new IllegalStateException(s"failed to read $clenTxt bytes of compressed text entries")
-    }
-    val ddataTxt: Array[Byte] = new Array[Byte](dlenTxt)
-    val iisTxt = new InflaterInputStream(new ByteArrayInputStream(cdataTxt))
-    if (iisTxt.read(ddataTxt) != dlenTxt) {
-      throw new IllegalStateException(s"failed to inflate $dlenTxt bytes of compressed text entries from $clenTxt compressed bytes")
-    }
-
     val lines: Array[String] = new Array[String](numTextLines)
-    val baisTxt = new DataInputStream(new ByteArrayInputStream(ddataTxt))
 
-    Range(0, numTextLines).foreach { index =>
-      val len: Short = baisTxt.readShort()
-      val data: Seq[Char] = Range(0, len).map(_ => baisTxt.readShort().toChar)
-      val line: String = data.mkString("")
-      lines(index) = line
+    if (numTextLines > 0) {
+      val clenTxt: Int = data.readInt()
+      val dlenTxt: Int = data.readInt()
+      val cdataTxt: Array[Byte] = new Array[Byte](clenTxt - 4)
+      if (data.read(cdataTxt) != clenTxt - 4) {
+        throw new IllegalStateException(s"failed to read $clenTxt bytes of compressed text entries")
+      }
+      val ddataTxt: Array[Byte] = new Array[Byte](dlenTxt)
+      val iisTxt = new InflaterInputStream(new ByteArrayInputStream(cdataTxt))
+      if (iisTxt.read(ddataTxt) != dlenTxt) {
+        throw new IllegalStateException(s"failed to inflate $dlenTxt bytes of compressed text entries from $clenTxt compressed bytes")
+      }
+
+      val baisTxt = new DataInputStream(new ByteArrayInputStream(ddataTxt))
+
+      Range(0, numTextLines).foreach { index =>
+        val len: Short = baisTxt.readShort()
+        val data: Seq[Char] = Range(0, len).map(_ => baisTxt.readShort().toChar)
+        val line: String = data.mkString("")
+        lines(index) = line
+      }
     }
 
     val packet = CompressedGumpPacket(serial, gumpId, x, y, gumpData, lines.toVector)
-
-    val gump = packet.gump
 
     packet
   }

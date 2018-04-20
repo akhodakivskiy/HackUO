@@ -23,7 +23,7 @@ abstract class GeneralInfoPacketSend(val subCommand: Int, val length: Int) exten
   def subSerialize(out: ByteBuffer): Unit
 }
 
-abstract class GeneralInfoPacketWithIntSend(payload: Int, subCommand: Int, length: Int) extends GeneralInfoPacketSend(subCommand, length) {
+abstract class GeneralInfoPacketWithIntSend(payload: Int, subCommand: Int) extends GeneralInfoPacketSend(subCommand, 9) {
   def subSerialize(out: ByteBuffer): Unit = out.putInt(payload)
 }
 
@@ -34,8 +34,8 @@ case class GiCloseGenericGumpPacket(dialogId: Int, buttonId: Int) extends Genera
 case class GiScreenSizePacket(width: Short, height: Short) extends GeneralInfoPacketRecv(0x5)
 case class GiSetMapPacket(mapId: Byte) extends GeneralInfoPacketRecv(0x8)
 
-case class PopupEntry(textId: Int, index: Short, flags: Short, hueOpt: Option[Short])
-case class GiShowPopupPacket(serial: Int, entries: Seq[PopupEntry]) extends GeneralInfoPacketRecv(0x14)
+case class GiPopupEntry(textId: Int, index: Short, flags: Short, hueOpt: Option[Short])
+case class GiShowPopupPacket(serial: Int, entries: Seq[GiPopupEntry]) extends GeneralInfoPacketRecv(0x14)
 case class GiCloseWindow(windowType: Int, serial: Int) extends GeneralInfoPacketRecv(0x16)
 object GiClearWeaponAbilityPacket extends GeneralInfoPacketRecv(0x21)
 case class GiDamagePacket(serial: Int, damage: Byte) extends GeneralInfoPacketRecv(0x22)
@@ -46,9 +46,14 @@ case class GiAbilityChangePacket(abilityId: Byte, state: Byte) extends GeneralIn
 case class GiClientLanguagePacket(language: String) extends GeneralInfoPacketSend(0xB, 8) {
   def subSerialize(out: ByteBuffer): Unit = out.put(language.getBytes(StandardCharsets.UTF_8).take(3))
 }
-case class GiCloseStatusBarPacket(serial: Int) extends GeneralInfoPacketWithIntSend(0xC, 9, serial)
-case class GiRequestPopupPacket(serial: Int) extends GeneralInfoPacketWithIntSend(0x13, 9, serial)
-case class GiSelectPopupEntryPacket(serial: Int, entryIndex: Short) extends GeneralInfoPacketWithIntSend(0x15, 9, serial)
+case class GiCloseStatusBarPacket(serial: Int) extends GeneralInfoPacketWithIntSend(serial, 0xC)
+case class GiRequestPopupPacket(serial: Int) extends GeneralInfoPacketWithIntSend(serial, 0x13)
+case class GiSelectPopupEntryPacket(serial: Int, entryIndex: Short) extends GeneralInfoPacketSend(0x15, 11) {
+  def subSerialize(out: ByteBuffer): Unit = {
+    out.putInt(serial)
+    out.putShort(entryIndex)
+  }
+}
 case class GiLockStatPacket(stat: Byte, lockState: Byte) extends GeneralInfoPacketSend(0x1A, 7) {
   def subSerialize(out: ByteBuffer): Unit = {
     out.put(stat)
@@ -124,13 +129,13 @@ object GeneralInfoPacketParser extends RecvPacketParser with LazyLogging {
         val numEntries: Byte = data.readByte()
         subSubCommand match {
           case 0x2 =>
-            val entries: Array[PopupEntry] = Array.fill(numEntries)(null)
+            val entries: Array[GiPopupEntry] = Array.fill(numEntries)(null)
             Range(0, numEntries).foreach { i =>
               val textId: Int = data.readInt()
               val index: Short = data.readShort()
               val flags: Short = data.readShort()
               val hueOpt: Option[Short] = if ((flags & 0x20) != 0) Some(data.readShort()) else None
-              entries(i) = PopupEntry(textId, index, flags, hueOpt)
+              entries(i) = GiPopupEntry(textId, index, flags, hueOpt)
             }
             GiShowPopupPacket(serial, entries)
           case _ => throw new NotImplementedError(s"can't parse non-KR client style popups")

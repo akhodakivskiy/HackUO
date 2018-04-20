@@ -155,6 +155,10 @@ object PacketManager {
     pm.registerParser(MoveAckPacketParser)
     pm.registerParser(MoveRejPacketParser)
     pm.registerParser(LoginDeniedPacketParser)
+    pm.registerParser(OpenPaperdollPacketParser)
+    pm.registerParser(DrawContainerPacketParser)
+    pm.registerParser(AddContainerItemsPacketParser)
+    pm.registerParser(ClilocResponsePacketParser)
 
     pm
   }

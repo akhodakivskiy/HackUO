@@ -2,10 +2,10 @@ package kdkvsk.hackuo.network.packets.recv
 
 import java.io.DataInputStream
 
-import kdkvsk.hackuo.model.common.{Direction, Serial}
+import kdkvsk.hackuo.model.common.{BodyId, Direction, Serial}
 import kdkvsk.hackuo.network.{RecvPacket, RecvPacketParser}
 
-case class LoginConfirmPacket(serial: Serial, bodyId: Short, x: Short, y: Short, z: Byte, facing: Byte, width: Short, height: Short) extends RecvPacket {
+case class LoginConfirmPacket(serial: Serial, typeId: BodyId, x: Short, y: Short, z: Byte, facing: Byte, width: Short, height: Short) extends RecvPacket {
   val id: Int = LoginConfirmPacketParser.packetId
 
   def direction: Direction.Type = Direction.fromByte(facing)
@@ -17,7 +17,7 @@ object LoginConfirmPacketParser extends RecvPacketParser {
   def parse(data: DataInputStream, size: Int): RecvPacket = {
     val serial: Serial = Serial(data.readInt())
     data.skipBytes(4)
-    val bodyId: Short = data.readShort()
+    val bodyId: BodyId = BodyId(data.readShort())
     val x: Short = data.readShort()
     val y: Short = data.readShort()
     data.skipBytes(1)
