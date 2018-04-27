@@ -18,18 +18,15 @@ trait TypeId2 {
 
 case class BodyId(value: Short) extends TypeId2 {
   override val hashCode: Int = scala.util.hashing.MurmurHash3.productHash(this)
-
   override val toString: String = f"BodyId($value%02x)"
 }
 
 case class GraphicId(value: Short) extends TypeId2 {
   override val hashCode: Int = scala.util.hashing.MurmurHash3.productHash(this)
-
   override val toString: String = f"GraphicId($value%02x)"
 }
 
 case class GumpId(value: Short) extends TypeId2 {
   override val hashCode: Int = scala.util.hashing.MurmurHash3.productHash(this)
-
   override val toString: String = f"GumpId($value%02x)"
 }

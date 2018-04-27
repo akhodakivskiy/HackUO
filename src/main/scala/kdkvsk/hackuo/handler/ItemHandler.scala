@@ -16,7 +16,7 @@ object ItemHandler extends Handler with ItemHandlerOps {
 
 trait ItemHandlerOps extends LazyLogging {
   def itemInfo(p: ItemInfoPacket): World.State = World.modify { w =>
-    val item: ObjectItem = ObjectItem(p.serial, p.typeId, p.amount, p.x, p.y, p.z, ItemLayer(p.layer), p.hue, p.direction, p.flag, 0)
+    val item: ObjectItem = ObjectItem(p.serial, p.typeId, p.amount, p.x, p.y, p.z, p.light, p.hue, p.direction, p.flag, 0)
     w.copy(objects = w.objects.updated(p.serial, item))
   }
 

@@ -2,16 +2,17 @@ package kdkvsk.hackuo.network.packets.recv
 
 import java.io.DataInputStream
 
+import kdkvsk.hackuo.lib.Cliloc
 import kdkvsk.hackuo.model.common.Serial
 import kdkvsk.hackuo.network.{RecvPacket, RecvPacketParser}
 
 import scala.collection.mutable
 
-case class ClilocItem(clilocId: Int, textOpt: Option[String])
+case class ClilocItem(clilocId: Int, textOpt: Option[String], args: String)
 
 case class ClilocResponsePacket(serial: Serial, items: Seq[ClilocItem]) extends RecvPacket
 
-object ClilocResponsePacketParser extends RecvPacketParser {
+case class ClilocResponsePacketParser(cliloc: Cliloc) extends RecvPacketParser {
   val packetId: Int = 0xD6
 
   def parse(data: DataInputStream, size: Int): RecvPacket = {
@@ -31,14 +32,16 @@ object ClilocResponsePacketParser extends RecvPacketParser {
       if (clilocId == 0) {
         continue = false
       } else {
-        val textLength: Short = data.readShort()
-        val textOpt: Option[String] = if (textLength > 0) {
-          Some(readUTF16LE(data, textLength))
+        val argsLength: Short = data.readShort()
+        val args: String = if (argsLength > 0) {
+          readUTF16LE(data, argsLength)
         } else {
-          None
+          ""
         }
 
-        items.append(ClilocItem(clilocId, textOpt))
+        val textOpt: Option[String] = cliloc.getAndReplace(clilocId, args)
+
+        items.append(ClilocItem(clilocId, textOpt, args))
       }
     }
 

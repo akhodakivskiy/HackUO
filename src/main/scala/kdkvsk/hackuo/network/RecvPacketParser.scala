@@ -5,7 +5,9 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.nio.charset.{Charset, StandardCharsets}
 
-trait RecvPacketParser {
+import com.typesafe.scalalogging.LazyLogging
+
+trait RecvPacketParser extends LazyLogging {
   def packetId: Int
 
   def parse(data: DataInputStream, size: Int): RecvPacket
@@ -21,8 +23,13 @@ trait RecvPacketParser {
   def readStringWithNull(data: DataInputStream, maxLength: Int): String = {
     val buffer: Array[Byte] = Array.fill(maxLength)(0x0)
     data.read(buffer, 0, maxLength)
-    val nameSize: Int = buffer.indexWhere(a => (a & 0xFF) == 0)
-    new String(buffer, 0, nameSize, "UTF-8")
+    val nameSize: Int = buffer.indexOf(0x0)
+    if (nameSize >= 0) {
+      new String(buffer, 0, nameSize, "UTF-8")
+    } else {
+      logger.warn(s"null byte not found within $maxLength bytes")
+      new String(buffer, 0, maxLength, "UTF-8")
+    }
   }
 
   def ensureLength(data: DataInputStream, length: Int): Unit = {

@@ -5,14 +5,14 @@ import java.io.DataInputStream
 import kdkvsk.hackuo.model.common.{BodyId, Direction, Serial}
 import kdkvsk.hackuo.network.{RecvPacket, RecvPacketParser}
 
-case class UpdatePlayerPacket(serial: Serial, bodyId: BodyId,
+case class UpdateMobilePacket(serial: Serial, bodyId: BodyId,
                               x: Short, y: Short, z: Byte,
                               direction: Direction.Type,
                               hue: Short, flags: Byte, highlightColor: Byte) extends RecvPacket {
-  def id: Int = UpdatePlayerPacketParser.packetId
+  def id: Int = UpdateMobilePacketParser.packetId
 }
 
-object UpdatePlayerPacketParser extends RecvPacketParser {
+object UpdateMobilePacketParser extends RecvPacketParser {
   val packetId: Int = 0x77
 
   def parse(data: DataInputStream, size: Int): RecvPacket = {
@@ -26,7 +26,7 @@ object UpdatePlayerPacketParser extends RecvPacketParser {
     val flag: Byte = data.readByte()
     val highlightColor: Byte = data.readByte()
 
-    UpdatePlayerPacket(serial, bodyId, x, y, z, direction, hue, flag, highlightColor)
+    UpdateMobilePacket(serial, bodyId, x, y, z, direction, hue, flag, highlightColor)
   }
 }
 

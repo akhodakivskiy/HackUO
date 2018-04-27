@@ -12,6 +12,9 @@ object MobileHandler extends Handler with MobileHandlerOps {
     case PacketMessage(p: DrawPlayerPacket) => drawPlayer(p)
     case PacketMessage(p: MobileIncomingPacket) => mobileIncoming(p)
     case PacketMessage(p: MobileStatusPacket) => mobileStatus(p)
+    case PacketMessage(p: UpdateMobileStatusPacket) => updateMobileStatus(p)
+    case PacketMessage(p: UpdateMobilePacket) => updateMobile(p)
+    case PacketMessage(p: WearItemByMobilePacket) => wearItemByMobile(p)
     case PacketMessage(p: WarModePacket) => warMode(p)
     case PacketMessage(p: DeletePacket) => deleteMobile(p)
     case PacketMessage(p: ItemRevisionHashPacket) => itemRevision(p)
@@ -81,6 +84,34 @@ trait MobileHandlerOps extends LazyLogging {
     }
   }
 
+  def updateMobileStatus(p: UpdateMobileStatusPacket): World.State = World.modify { w =>
+    w.mobiles.get(p.serial) match {
+      case None =>
+        logger.warn(s"mobile ${p.serial} not found for ${p.getClass.getSimpleName} update")
+        w
+      case Some(mobile) =>
+        val newMobile: Mobile = mobile.copy(
+          hits = p.hits, maxHits = p.maxHits,
+          mana = p.mana, maxMana = p.maxMana,
+          stamina = p.stamina, maxStamina = p.maxStamina
+        )
+
+        w.copy(mobiles = w.mobiles.updated(p.serial, newMobile))
+    }
+  }
+
+  def wearItemByMobile(p: WearItemByMobilePacket): World.State = World.modify { w =>
+    w.mobiles.get(p.mobileSerial) match {
+      case None =>
+        logger.warn(s"mobile ${p.mobileSerial} not found for ${p.getClass.getSimpleName} update")
+        w
+      case Some(mobile) =>
+        val i: MobileItem = MobileItem(p.serial, p.graphicId, ItemLayer(p.layer), p.hue, 0x0)
+        w.copy(mobiles = w.mobiles.updated(mobile.serial, mobile.copy(items = mobile.items.updated(i.serial, i))),
+          item2mobile = w.item2mobile.updated(i.serial, mobile.serial))
+    }
+  }
+
   def warMode(p: WarModePacket): World.State = World.modify { w =>
     w.mobiles.get(w.playerSerial) match {
       case Some(player) => w.copy(mobiles = w.mobiles.updated(player.serial, player.copy(warMode = p.mode == 1)))
@@ -88,7 +119,7 @@ trait MobileHandlerOps extends LazyLogging {
     }
   }
 
-  def updatePlayer(p: UpdatePlayerPacket): World.State = World.modify { w =>
+  def updateMobile(p: UpdateMobilePacket): World.State = World.modify { w =>
     w.mobiles.get(p.serial) match {
       case Some(mobile) =>
         val newMobile = mobile.copy(bodyId = p.bodyId, x = p.x, y = p.y, z = p.z, direction = p.direction, hue = p.hue, flags = p.flags)

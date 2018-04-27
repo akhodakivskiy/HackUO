@@ -2,16 +2,17 @@ package kdkvsk.hackuo.handler
 
 import cats.data.State
 import com.typesafe.scalalogging.LazyLogging
-import kdkvsk.hackuo.model.common.Serial
+import kdkvsk.hackuo.model.common.{GumpId, Serial}
 import kdkvsk.hackuo.{Message, MultiResponse, PacketMessage, Response}
 import kdkvsk.hackuo.model.{Container, ContainerItem, World}
-import kdkvsk.hackuo.network.packets.recv.{AddContainerItemsPacket, DeletePacket, DrawContainerPacket, ItemRevisionHashPacket}
+import kdkvsk.hackuo.network.packets.recv._
 
 object ContainerHandler extends Handler with ContainerHandlerOps {
   val handle: PartialFunction[Message, State[World, Response]] = {
     case PacketMessage(p: ItemRevisionHashPacket) => itemHash(p)
     case PacketMessage(p: DrawContainerPacket) => drawContainer(p)
     case PacketMessage(p: AddContainerItemsPacket) => addContainerItems(p)
+    case PacketMessage(p: AddItemToContainerPacket) => addItemToContainer(p)
     case PacketMessage(p: DeletePacket) => deleteItem(p)
   }
 }
@@ -39,6 +40,14 @@ trait ContainerHandlerOps extends LazyLogging {
             w
         }
     }
+  }
+
+  def addItemToContainer(p: AddItemToContainerPacket): World.State = World.modify { w =>
+    val c: Container = w.containers.getOrElse(p.containerSerial, Container(p.containerSerial, GumpId(0), Map.empty))
+    val i: ContainerItem = ContainerItem(p.serial, p.graphicId, p.amount,
+                         p.x, p.y, p.gridIndexOpt.map(_.intValue()), p.hue, p.containerSerial, 0x0)
+    w.copy(containers = w.containers.updated(c.serial, c.copy(items = c.items.updated(i.serial, i))),
+      item2container = w.item2container.updated(i.serial, c.serial))
   }
 
   def deleteItem(p: DeletePacket): World.State = {

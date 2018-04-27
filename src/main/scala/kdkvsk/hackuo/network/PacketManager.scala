@@ -5,6 +5,7 @@ import java.net.Socket
 import java.nio.ByteBuffer
 
 import com.typesafe.scalalogging.LazyLogging
+import kdkvsk.hackuo.lib.Cliloc
 import kdkvsk.hackuo.lib.compression.{Compression, NoCompression}
 import kdkvsk.hackuo.lib.crytpo.{Crypto, NoCrypto}
 import kdkvsk.hackuo.network.packets.recv._
@@ -98,7 +99,7 @@ class PacketManager(socket: Socket) extends LazyLogging {
                 result = Some(packet)
 
                 if (logPackets) {
-                  logger.info(s"received <<< $packet")
+                  logger.info(f"received <<< $packetId%02x $packet")
                 }
               } catch {
                 case e: Exception =>
@@ -123,7 +124,7 @@ class PacketManager(socket: Socket) extends LazyLogging {
 }
 
 object PacketManager {
-  def withParsers(socket: Socket, newClient: Boolean): PacketManager = {
+  def withParsers(socket: Socket, cliloc: Cliloc, newClient: Boolean): PacketManager = {
     val pm = new PacketManager(socket)
 
     pm.registerParser(ServerListPacketParser)
@@ -149,8 +150,9 @@ object PacketManager {
     pm.registerParser(MessageAsciiPacketParser)
     pm.registerParser(ItemInfoPacketParser)
     pm.registerParser(DeletePacketParser)
-    pm.registerParser(UpdatePlayerPacketParser)
+    pm.registerParser(UpdateMobilePacketParser)
     pm.registerParser(MobileAnimationPacketParser)
+    pm.registerParser(NewMobileAnimationPacketParser)
     pm.registerParser(SetWeatherPacketParser)
     pm.registerParser(MoveAckPacketParser)
     pm.registerParser(MoveRejPacketParser)
@@ -158,7 +160,16 @@ object PacketManager {
     pm.registerParser(OpenPaperdollPacketParser)
     pm.registerParser(DrawContainerPacketParser)
     pm.registerParser(AddContainerItemsPacketParser)
-    pm.registerParser(ClilocResponsePacketParser)
+    pm.registerParser(AddItemToContainerPacketParser)
+    pm.registerParser(ClilocResponsePacketParser(cliloc))
+    pm.registerParser(ClilocMessagePacketParser(cliloc))
+    pm.registerParser(HealthUpdatePacketParser)
+    pm.registerParser(UpdateMobileStatusPacketParser)
+    pm.registerParser(WearItemByMobilePacketParser)
+    pm.registerParser(PlayMidiMusicPacketParser)
+    pm.registerParser(PlaySoundPacketParser)
+    pm.registerParser(GraphicalEffectPacketParser)
+    pm.registerParser(DragAnimationPacketParser)
 
     pm
   }

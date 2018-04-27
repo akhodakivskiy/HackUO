@@ -1,5 +1,6 @@
 package kdkvsk.hackuo.network
 
+import java.io.DataInputStream
 import java.nio.ByteBuffer
 
 trait RecvPacket

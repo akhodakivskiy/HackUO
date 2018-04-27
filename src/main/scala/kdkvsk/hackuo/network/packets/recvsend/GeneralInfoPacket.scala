@@ -39,7 +39,7 @@ case class GiShowPopupPacket(serial: Int, entries: Seq[GiPopupEntry]) extends Ge
 case class GiCloseWindow(windowType: Int, serial: Int) extends GeneralInfoPacketRecv(0x16)
 object GiClearWeaponAbilityPacket extends GeneralInfoPacketRecv(0x21)
 case class GiDamagePacket(serial: Int, damage: Byte) extends GeneralInfoPacketRecv(0x22)
-case class GiAbilityChangePacket(abilityId: Byte, state: Byte) extends GeneralInfoPacketRecv(0x22)
+case class GiAbilityChangePacket(abilityId: Short, state: Byte) extends GeneralInfoPacketRecv(0x22)
 
 /* Send packets */
 
@@ -155,7 +155,7 @@ object GeneralInfoPacketParser extends RecvPacketParser with LazyLogging {
       case 0x22 =>
         data.skipBytes(1)
         GiDamagePacket(data.readInt(), data.readByte())
-      case 0x25 => GiAbilityChangePacket(data.readByte(), data.readByte())
+      case 0x25 => GiAbilityChangePacket(data.readShort(), data.readByte())
       case _ =>
         logger.info(f"unrecognized subCommand $subCommand%02x")
         RecvIgnoredPacket(packetId, packetSize, s"unrecognized sub command $subCommand%02x")

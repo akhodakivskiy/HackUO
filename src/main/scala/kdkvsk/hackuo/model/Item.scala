@@ -10,7 +10,7 @@ trait Item {
 
 case class ObjectItem(serial: Serial, graphicId: GraphicId, amount: Int,
                       x: Int, y: Int, z: Int,
-                      layer: ItemLayer.Type, hue: Int, direction: Direction.Type, flag: Int,
+                      light: Byte, hue: Int, direction: Direction.Type, flag: Int,
                       itemHash: Int) extends Item
 
 case class MultiItem(serial: Serial, graphicId: GraphicId, x: Int, y: Int, z: Int, itemHash: Int) extends Item

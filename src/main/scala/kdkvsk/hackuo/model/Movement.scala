@@ -10,6 +10,3 @@ case class Movement(x: Int = 0,
                     isEnabled: Boolean = false,
                     retryCount: Int = 0) extends Point2D
 
-object Movement {
-  type State[T] = cats.data.State[Movement, T]
-}

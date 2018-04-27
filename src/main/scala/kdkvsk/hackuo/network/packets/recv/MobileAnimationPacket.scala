@@ -5,19 +5,20 @@ import java.io.DataInputStream
 import kdkvsk.hackuo.model.common.Serial
 import kdkvsk.hackuo.network.{RecvPacket, RecvPacketParser}
 
-case class MobileAnimationPacket(serial: Serial, actionType: Short, subActionType: Short, subSubActionType: Byte) extends RecvPacket  {
-  def id: Int = MobileAnimationPacketParser.packetId
-}
+case class MobileAnimationPacket(serial: Serial, action: Short, frameCount: Byte, repeatCount: Short, reverse: Byte, repeatFlag: Byte, frameDelay: Byte) extends RecvPacket
 
 object MobileAnimationPacketParser extends RecvPacketParser {
-  val packetId: Int = 0xE2
+  val packetId: Int = 0x6E
 
   def parse(data: DataInputStream, size: Int): RecvPacket = {
     val serial: Serial = Serial(data.readInt())
-    val actionType: Short = data.readShort()
-    val subActionType: Short = data.readShort()
-    val subSubActionType: Byte=data.readByte()
+    val action: Short = data.readShort()
+    val frameCount: Byte = data.readByte()
+    val repeatCount: Byte = data.readByte()
+    val reverse: Byte = data.readByte()
+    val repeatFlag: Byte = data.readByte()
+    val frameDelay: Byte = data.readByte()
 
-    MobileAnimationPacket(serial, actionType, subActionType, subSubActionType)
+    MobileAnimationPacket(serial, action, frameCount, repeatCount, reverse, repeatFlag, frameDelay)
   }
 }
