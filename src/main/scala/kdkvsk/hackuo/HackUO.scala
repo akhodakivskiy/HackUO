@@ -2,17 +2,16 @@ package kdkvsk.hackuo
 
 import java.net._
 import java.nio.ByteBuffer
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Path, Paths}
 import java.util.concurrent.ArrayBlockingQueue
 
 import com.typesafe.scalalogging.LazyLogging
+import kdkvsk.hackuo.client._
+import kdkvsk.hackuo.client.compression.HuffmanCompression
+import kdkvsk.hackuo.client.crytpo.{GameCrypto, LoginCrypto}
 import kdkvsk.hackuo.handler._
-import kdkvsk.hackuo.lib._
-import kdkvsk.hackuo.lib.compression.HuffmanCompression
-import kdkvsk.hackuo.lib.crytpo.{GameCrypto, LoginCrypto}
-import kdkvsk.hackuo.lib.map.TileData
+import kdkvsk.hackuo.model.common.{ClientFlag, ClientVersion}
 import kdkvsk.hackuo.model.{LoginState, World}
-import kdkvsk.hackuo.model.common.ClientVersion
 import kdkvsk.hackuo.network.PacketManager
 import kdkvsk.hackuo.network.packets.recv._
 import kdkvsk.hackuo.network.packets.send._
@@ -20,51 +19,46 @@ import scopt.{OptionParser, Read}
 
 import scala.concurrent.ExecutionContext
 import scala.io.StdIn
-import scala.collection.JavaConverters._
 
 object HackUO {
 
-  case class Config(host: InetAddress = InetAddress.getLocalHost,
-                    port: Int = -1,
+  case class Config(hostOpt: Option[InetAddress] = None,
+                    portOpt: Option[Int] = None,
                     username: String = null,
                     password: String = null,
                     clientDir: Path = null,
                     clientVersion: ClientVersion = null,
                     clientLanguage: String = "enu",
-                    nextLoginKey: Int = 0,
                     serverName: String = null,
                     characterName: String = null,
-                    clientFlag: ClientFlag.Type = null,
+                    clientFlagOpt: Option[Int] = None,
                     loginCount: Int = 0,
                     isEncrypted: Boolean = false) {
-    def clilocPath: Path = findClientFile(s"Cliloc.$clientLanguage")
-
-    def tileDataPath: Path = findClientFile("tiledata.mul")
-
-    def findClientFile(fileName: String): Path = {
-      Files.list(clientDir).iterator().asScala
-        .find(_.getFileName.toString.compareToIgnoreCase(fileName) == 0)
-        .getOrElse(throw new IllegalArgumentException(s"can't find $fileName in $clientDir"))
+    val loginServerOpt: Option[(InetAddress, Int)] = {
+      for {
+        host <- hostOpt
+        port <- portOpt
+      } yield {
+        (host, port)
+      }
     }
   }
 
-  import ClientFlag.clientFlagReader
   import ClientVersion.clientVersionReader
 
   implicit var pathReader: Read[Path] = Read.reads(s => Paths.get(s))
 
   val parser = new OptionParser[Config](this.getClass.getSimpleName) {
-    opt[String]("host").optional().text("server host name").action((v, c) => c.copy(host = InetAddress.getByName(v)))
-    opt[Int]("port").required().text("server port").action((v, c) => c.copy(port = v))
-    opt[String]("username").required().text("account username").action((v, c) => c.copy(username = v))
-    opt[String]("password").required().text("account password").action((v, c) => c.copy(password = v))
     opt[Path]("client-dir").required().text("path to the folder with UO client files").action((v, c) => c.copy(clientDir = v))
     opt[ClientVersion]("client-version").required().text("emulated client version").action((v, c) => c.copy(clientVersion = v))
-    opt[String]("client-language").optional().text("client language for cliloc").action((v, c) => c.copy(clientLanguage = v))
-    opt[Int]("next-login-key").required().text("next login key (from uo.cfg)").action((v, c) => c.copy(nextLoginKey = v))
+    opt[String]("username").required().text("account username").action((v, c) => c.copy(username = v))
+    opt[String]("password").required().text("account password").action((v, c) => c.copy(password = v))
     opt[String]("server").required().text("server name").action((v, c) => c.copy(serverName = v))
     opt[String]("character").required().text("character name").action((v, c) => c.copy(characterName = v))
-    opt[ClientFlag.Type]("client-flag").required().text(s"client flag indicating uo version: (${ClientFlag.values.mkString(", ")})").action((v, c) => c.copy(clientFlag = v))
+    opt[String]("host").optional().text("server host name").action((v, c) => c.copy(hostOpt = Some(InetAddress.getByName(v))))
+    opt[Int]("port").optional().text("server port").action((v, c) => c.copy(portOpt = Some(v)))
+    opt[String]("client-language").optional().text("client language for cliloc").action((v, c) => c.copy(clientLanguage = v))
+    opt[Int]("client-flag").optional().text(s"client flag indicating uo version").action((v, c) => c.copy(clientFlagOpt = Some(v)))
     opt[Int]("login-count").optional().text("login count (defaults to 0)").action((v, c) => c.copy(loginCount = v))
     opt[Unit]("encrypted").optional().text("OSI server encryption on").action((v, c) => c.copy(isEncrypted = true))
   }
@@ -78,11 +72,7 @@ object HackUO {
 }
 
 class HackUO(config: HackUO.Config) extends LazyLogging {
-  val cliloc = Cliloc.load(config.clilocPath)
-  logger.info(s"loaded ${cliloc.entries.size} entries")
-
-  val tileData: TileData = TileData.load(config.tileDataPath)
-  logger.info(s"loaded ${tileData.landData.size} land tiles, and ${tileData.itemData} item tiles")
+  val client = new Client(config.clientDir, config.clientLanguage)
 
   val messageQueue: ArrayBlockingQueue[Message] = new ArrayBlockingQueue[Message](1000000)
 
@@ -93,7 +83,7 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
 
     val socket: Socket = new Socket(serverIp, serverPort)
 
-    val pm: PacketManager = PacketManager.withParsers(socket, cliloc, newClient = true)
+    val pm: PacketManager = PacketManager.withParsers(socket, client.cliloc, newClient = true)
     pm.setCompression(new HuffmanCompression())
     if (config.isEncrypted) {
       pm.setCrypto(new GameCrypto(authId))
@@ -101,9 +91,9 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
 
     val loginState: LoginState = LoginState(config.username, config.password,
       clientIp, serverIp, serverPort, authId, config.clientVersion, serverName, config.characterName,
-      config.clientFlag, config.loginCount)
+      config.clientFlagOpt.getOrElse(ClientFlag.Latest.toBitMask.head.toInt), config.loginCount)
 
-    val world: World = World(login = loginState)
+    val world: World = World(client, login = loginState)
 
     val handler: MultiHandler = MultiHandler(MovementHandler :: ItemHandler :: ContainerHandler :: MobileHandler :: LoginHandler :: InteractionHandler :: REPLHandler :: Nil)
 
@@ -115,7 +105,7 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
     authIdBuffer.putInt(authId)
     socket.getOutputStream.write(authIdBuffer.array(), 0, 4)
 
-    messageQueue.put(ConnectedMessage)
+    messageQueue.put(StartupMessage)
 
     while (!socket.isClosed) {
       val command: String = StdIn.readLine("> ")
@@ -153,7 +143,7 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
 
           world = newWorld
 
-          if (message == DisconnectedMessage) {
+          if (message == ShutdownMessage) {
             continue = false
           }
         }
@@ -176,22 +166,27 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
           Thread.sleep(10)
         }
 
-        messageQueue.put(DisconnectedMessage)
+        messageQueue.put(ShutdownMessage)
       }
     })
   }
 
   def login(clientIpAddress: InetAddress): (String, InetAddress, Int, Int) = {
-    val socket: Socket = new Socket(config.host, config.port)
-    val pm: PacketManager = PacketManager.withParsers(socket, cliloc, newClient = true)
+    val (loginHost, loginPort) = config.loginServerOpt.orElse(ClientConfig.loginServerOpt(client.configLogin)).getOrElse {
+      throw new IllegalArgumentException(s"please specify host and port as command line parameters, or in Login.cfg")
+    }
 
-    val seedPacket = SeedPacket(clientIpAddress, config.clientVersion)
+    val nextLoginKey: Int = ClientConfig.nextLoginKey(client.configUo)
+    val socket: Socket = new Socket(loginHost, loginPort)
+    val pm: PacketManager = PacketManager.withParsers(socket, client.cliloc, newClient = true)
+
+    val seedPacket = xEF_SeedPacket(clientIpAddress, config.clientVersion)
     pm.send(seedPacket)
     if (config.isEncrypted) {
       val (key1, key2) = config.clientVersion.keys
-      pm.setCrypto(new LoginCrypto(SeedPacket.seed(clientIpAddress), key1, key2))
+      pm.setCrypto(new LoginCrypto(xEF_SeedPacket.seed(clientIpAddress), key1, key2))
     }
-    pm.send(AccountLoginPacket(config.username, config.password, config.nextLoginKey))
+    pm.send(x80_AccountLoginPacket(config.username, config.password, nextLoginKey))
 
     var repeat: Int = 100
     val delay: Long = 100L
@@ -205,22 +200,22 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
 
     while (!loggedIn && repeat > 0) {
       pm.readPacket() match {
-        case Some(ServerListPacket(infoFlag, servers)) =>
+        case Some(xA8_ServerListPacket(infoFlag, servers)) =>
           servers.find(_.name == config.serverName) match {
             case Some(server) =>
               serverName = server.name
-              pm.send(SelectServerPacket(server.index))
+              pm.send(xA0_SelectServerPacket(server.index))
             case None =>
               logger.error(s"server '${config.serverName}' not found")
               System.exit(0)
           }
-        case Some(ServerLoginPacket(ip, p, a)) =>
+        case Some(x8C_ServerLoginPacket(ip, p, a)) =>
           ipAddress = ip
           port = p
           authId = a
 
           loggedIn = true
-        case Some(LoginDeniedPacket(reason)) =>
+        case Some(x82_LoginDeniedPacket(reason)) =>
           logger.error(s"login denied due to $reason")
           System.exit(0)
         case Some(packet) =>

@@ -1,9 +1,11 @@
 package kdkvsk.hackuo.model
 
+import kdkvsk.hackuo.client.Client
 import kdkvsk.hackuo.model.common.Serial
 import kdkvsk.hackuo.{NoopResponse, Response}
 
-case class World(login: LoginState,
+case class World(client: Client,
+                 login: LoginState,
                  mapId: Int = 0,
                  playerSerial: Serial = Serial(0),
 

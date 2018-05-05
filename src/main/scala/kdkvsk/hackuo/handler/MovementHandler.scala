@@ -1,11 +1,12 @@
 package kdkvsk.hackuo.handler
 import cats.data.State
 import com.typesafe.scalalogging.LazyLogging
+import kdkvsk.hackuo.client.map.LandTile
 import kdkvsk.hackuo.model._
 import kdkvsk.hackuo.model.common.Direction
-import kdkvsk.hackuo.network.packets.recv.{MoveAckPacket, MoveRejPacket}
-import kdkvsk.hackuo.network.packets.recvsend.{GiFastWalkPreventionAddKeyPacket, GiFastWalkPreventionInitPacket}
-import kdkvsk.hackuo.network.packets.send.MoveRequestPacket
+import kdkvsk.hackuo.network.packets.recv.{x22_MoveAckPacket, x21_MoveRejPacket}
+import kdkvsk.hackuo.network.packets.recvsend.{xBF_2_FastWalkPreventionAddKeyPacket, xBF_1_FastWalkPreventionInitPacket}
+import kdkvsk.hackuo.network.packets.send.x02_MoveRequestPacket
 import kdkvsk.hackuo.{HandlerMessage, Message, PacketMessage, PacketResponse}
 
 case class StartMoveHandlerMessage(dx: Int, dy: Int, isRunning: Boolean, retryCount: Int) extends HandlerMessage
@@ -15,10 +16,10 @@ object SyncMoveHandlerMessage extends HandlerMessage
 object MovementHandler extends Handler with MoveHandlerOps {
   val handle: PartialFunction[Message, World.State] = {
     //case PacketMessage(LoginCompletePacket) => initFastKeys
-    case PacketMessage(p: GiFastWalkPreventionInitPacket) => fastWalkInit(p)
-    case PacketMessage(p: GiFastWalkPreventionAddKeyPacket) => fastWalkAddKey(p)
-    case PacketMessage(p: MoveAckPacket) => moveAccept(p)
-    case PacketMessage(p: MoveRejPacket) => moveReject(p)
+    case PacketMessage(p: xBF_1_FastWalkPreventionInitPacket) => fastWalkInit(p)
+    case PacketMessage(p: xBF_2_FastWalkPreventionAddKeyPacket) => fastWalkAddKey(p)
+    case PacketMessage(p: x22_MoveAckPacket) => moveAccept(p)
+    case PacketMessage(p: x21_MoveRejPacket) => moveReject(p)
     case StartMoveHandlerMessage(dx, dy, isRunning, retryCount) => startMove(dx, dy, isRunning, retryCount)
     case StopMoveHandlerMessage => stopMove
     case SyncMoveHandlerMessage => syncRequest
@@ -28,23 +29,27 @@ object MovementHandler extends Handler with MoveHandlerOps {
 trait MoveHandlerOps extends LazyLogging {
   val initFastKeys: World.State = State.pure {
     val keys: List[Int] = List.iterate[Int](1, 6)(_ + 1)
-    PacketResponse(GiFastWalkPreventionInitPacket(keys))
+    PacketResponse(xBF_1_FastWalkPreventionInitPacket(keys))
   }
 
-  def fastWalkInit(p: GiFastWalkPreventionInitPacket): World.State = World.modify { w =>
+  def fastWalkInit(p: xBF_1_FastWalkPreventionInitPacket): World.State = World.modify { w =>
     w.copy(movement = w.movement.copy(fastWalkStack = p.keys))
   }
 
-  def fastWalkAddKey(p: GiFastWalkPreventionAddKeyPacket): World.State = World.modify { w =>
+  def fastWalkAddKey(p: xBF_2_FastWalkPreventionAddKeyPacket): World.State = World.modify { w =>
     w.copy(movement = w.movement.copy(fastWalkStack = p.key :: w.movement.fastWalkStack))
   }
 
-  def moveAccept(p: MoveAckPacket): World.State = {
+  def moveAccept(p: x22_MoveAckPacket): World.State = {
     World.stateIfElse(_.movement.isEnabled) {
       State.modify[World] { w =>
         val moveDirection: Direction.Type = Point2D.direction(w.player, w.movement)
         if (w.player.direction == moveDirection) {
           val (newX, newY) = Point2D.pointInDirection(w.player, w.player.direction)
+
+          val tile: LandTile = w.client.maps(0).tileMatrix.getLandTile(newX, newY)
+          logger.info(s"tile: $tile")
+
           w.modifyPlayer(_.copy(x = newX, y = newY))
         } else {
           w.modifyPlayer(_.copy(direction = moveDirection))
@@ -57,7 +62,7 @@ trait MoveHandlerOps extends LazyLogging {
     }
   }
 
-  def moveReject(p: MoveRejPacket): World.State = {
+  def moveReject(p: x21_MoveRejPacket): World.State = {
     for {
       _ <- World.modify(_.modifyMovement(m => m.copy(retryCount = m.retryCount - 1, sequence = 0)))
       r <- World.stateIfElse(_.movement.retryCount <= 0)(stopMove)(moveRequest)
@@ -95,7 +100,7 @@ trait MoveHandlerOps extends LazyLogging {
         sequence <- incrementSequence
         fastKey <- popFastWalkKey
       } yield {
-        PacketResponse(MoveRequestPacket(direction, ms.isRunning, sequence, fastKey))
+        PacketResponse(x02_MoveRequestPacket(direction, ms.isRunning, sequence, fastKey))
       }
     }
   }
@@ -123,7 +128,7 @@ trait MoveHandlerOps extends LazyLogging {
       sequence <- incrementSequence
       notoriety <- State.inspect[World, Notoriety.Type](_.player.notoriety)
     } yield {
-      PacketResponse(MoveAckPacket(sequence.byteValue(), notoriety))
+      PacketResponse(x22_MoveAckPacket(sequence.byteValue(), notoriety))
     }
   }
 }

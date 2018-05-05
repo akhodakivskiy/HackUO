@@ -1,6 +1,6 @@
 package kdkvsk.hackuo.network
 
-import kdkvsk.hackuo.lib.compression.HuffmanCompression
+import kdkvsk.hackuo.client.compression.HuffmanCompression
 import org.scalatest.{FunSuite, Matchers}
 
 class HuffmanCompressionTest extends FunSuite with Matchers {

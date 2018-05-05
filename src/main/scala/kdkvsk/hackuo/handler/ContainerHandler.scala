@@ -9,21 +9,21 @@ import kdkvsk.hackuo.network.packets.recv._
 
 object ContainerHandler extends Handler with ContainerHandlerOps {
   val handle: PartialFunction[Message, State[World, Response]] = {
-    case PacketMessage(p: ItemRevisionHashPacket) => itemHash(p)
-    case PacketMessage(p: DrawContainerPacket) => drawContainer(p)
-    case PacketMessage(p: AddContainerItemsPacket) => addContainerItems(p)
-    case PacketMessage(p: AddItemToContainerPacket) => addItemToContainer(p)
-    case PacketMessage(p: DeletePacket) => deleteItem(p)
+    case PacketMessage(p: xDC_ItemRevisionHashPacket) => itemHash(p)
+    case PacketMessage(p: x24_DrawContainerPacket) => drawContainer(p)
+    case PacketMessage(p: x3C_AddContainerItemsPacket) => addContainerItems(p)
+    case PacketMessage(p: x25_AddItemToContainerPacket) => addItemToContainer(p)
+    case PacketMessage(p: x1D_DeletePacket) => deleteItem(p)
   }
 }
 
 trait ContainerHandlerOps extends LazyLogging {
 
-  def drawContainer(p: DrawContainerPacket): World.State = World.modify { w =>
+  def drawContainer(p: x24_DrawContainerPacket): World.State = World.modify { w =>
     w.copy(containers = w.containers.updated(p.serial, Container(p.serial, p.gumpId, Map.empty)))
   }
 
-  def addContainerItems(p: AddContainerItemsPacket): World.State = World.modify { world =>
+  def addContainerItems(p: x3C_AddContainerItemsPacket): World.State = World.modify { world =>
     p.items.groupBy(_.containerSerial).foldLeft(world) {
       case (w, (cid, its)) =>
         w.containers.get(cid) match {
@@ -42,7 +42,7 @@ trait ContainerHandlerOps extends LazyLogging {
     }
   }
 
-  def addItemToContainer(p: AddItemToContainerPacket): World.State = World.modify { w =>
+  def addItemToContainer(p: x25_AddItemToContainerPacket): World.State = World.modify { w =>
     val c: Container = w.containers.getOrElse(p.containerSerial, Container(p.containerSerial, GumpId(0), Map.empty))
     val i: ContainerItem = ContainerItem(p.serial, p.graphicId, p.amount,
                          p.x, p.y, p.gridIndexOpt.map(_.intValue()), p.hue, p.containerSerial, 0x0)
@@ -50,7 +50,7 @@ trait ContainerHandlerOps extends LazyLogging {
       item2container = w.item2container.updated(i.serial, c.serial))
   }
 
-  def deleteItem(p: DeletePacket): World.State = {
+  def deleteItem(p: x1D_DeletePacket): World.State = {
     for {
       p1 <- deleteContainer(p.serial)
       p2 <- deleteContainerItem(p.serial)
@@ -73,7 +73,7 @@ trait ContainerHandlerOps extends LazyLogging {
     }
   }
 
-  def itemHash(p: ItemRevisionHashPacket): World.State = World.modify { w =>
+  def itemHash(p: xDC_ItemRevisionHashPacket): World.State = World.modify { w =>
     (for {
       cid <- w.item2container.get(p.serial)
       c <- w.containers.get(cid)

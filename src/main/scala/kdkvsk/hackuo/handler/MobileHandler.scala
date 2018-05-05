@@ -1,34 +1,36 @@
 package kdkvsk.hackuo.handler
 import com.typesafe.scalalogging.LazyLogging
+import kdkvsk.hackuo.client.map.{LandTile, StaticTile}
 import kdkvsk.hackuo.{Message, PacketMessage}
 import kdkvsk.hackuo.model._
 import kdkvsk.hackuo.model.common.{ItemLayer, Serial}
 import kdkvsk.hackuo.network.packets.recv._
-import kdkvsk.hackuo.network.packets.recvsend.{GiSetMapPacket, WarModePacket}
+import kdkvsk.hackuo.network.packets.recvsend.{xBF_8_SetMapPacket, x72_WarModePacket}
 
 object MobileHandler extends Handler with MobileHandlerOps {
   val handle: PartialFunction[Message, World.State] = {
-    case PacketMessage(p: LoginConfirmPacket) => loginConfirm(p)
-    case PacketMessage(p: DrawPlayerPacket) => drawPlayer(p)
-    case PacketMessage(p: MobileIncomingPacket) => mobileIncoming(p)
-    case PacketMessage(p: MobileStatusPacket) => mobileStatus(p)
-    case PacketMessage(p: UpdateMobileStatusPacket) => updateMobileStatus(p)
-    case PacketMessage(p: UpdateMobilePacket) => updateMobile(p)
-    case PacketMessage(p: WearItemByMobilePacket) => wearItemByMobile(p)
-    case PacketMessage(p: WarModePacket) => warMode(p)
-    case PacketMessage(p: DeletePacket) => deleteMobile(p)
-    case PacketMessage(p: ItemRevisionHashPacket) => itemRevision(p)
+    case PacketMessage(p: x1B_LoginConfirmPacket) => loginConfirm(p)
+    case PacketMessage(p: x20_DrawPlayerPacket) => drawPlayer(p)
+    case PacketMessage(p: x78_MobileIncomingPacket) => mobileIncoming(p)
+    case PacketMessage(p: x11_MobileStatusPacket) => mobileStatus(p)
+    case PacketMessage(p: x2D_UpdateMobileStatusPacket) => updateMobileStatus(p)
+    case PacketMessage(p: x77_UpdateMobilePacket) => updateMobile(p)
+    case PacketMessage(p: x2E_WearItemByMobilePacket) => wearItemByMobile(p)
+    case PacketMessage(p: x72_WarModePacket) => warMode(p)
+    case PacketMessage(p: x1D_DeletePacket) => deleteMobile(p)
+    case PacketMessage(p: xDC_ItemRevisionHashPacket) => itemRevision(p)
+    case PacketMessage(p: xBF_8_SetMapPacket) => setMap(p)
   }
 }
 
 trait MobileHandlerOps extends LazyLogging {
-  def loginConfirm(p: LoginConfirmPacket): World.State = World.modify { w =>
+  def loginConfirm(p: x1B_LoginConfirmPacket): World.State = World.modify { w =>
     w.copy(
       playerSerial = p.serial,
       mobiles = w.mobiles.updated(p.serial, Mobile(p.serial, p.typeId, 0, p.x, p.y, p.z, flags = 0, p.direction)))
   }
 
-  def drawPlayer(p: DrawPlayerPacket): World.State = World.modify { w =>
+  def drawPlayer(p: x20_DrawPlayerPacket): World.State = World.modify { w =>
     val mobile: Mobile = w.mobiles
       .getOrElse(p.serial, Mobile(p.serial, p.bodyId, p.hue, p.x, p.y, p.z, p.flags, p.direction))
       .copy(bodyId = p.bodyId, hue = p.hue, x = p.x, y = p.y, z = p.z, direction = p.direction)
@@ -36,7 +38,7 @@ trait MobileHandlerOps extends LazyLogging {
     w.copy(mobiles = w.mobiles.updated(mobile.serial, mobile))
   }
 
-  def mobileIncoming(p: MobileIncomingPacket): World.State = World.modify { w =>
+  def mobileIncoming(p: x78_MobileIncomingPacket): World.State = World.modify { w =>
     val items: Map[Serial, MobileItem] = p.items.map { i =>
       i.serial -> MobileItem(i.serial, i.graphicId, ItemLayer(i.layer), i.hue, 0)
     }.toMap
@@ -48,7 +50,7 @@ trait MobileHandlerOps extends LazyLogging {
     w.copy(mobiles = w.mobiles.updated(mobile.serial, mobile), item2mobile = w.item2mobile ++ p.items.map(i => i.serial -> mobile.serial))
   }
 
-  def mobileStatus(p: MobileStatusPacket): World.State = World.modify { w =>
+  def mobileStatus(p: x11_MobileStatusPacket): World.State = World.modify { w =>
     w.mobiles.get(p.serial) match {
       case None =>
         logger.warn(s"mobile ${p.serial} not found for ${p.getClass.getSimpleName} update")
@@ -84,7 +86,7 @@ trait MobileHandlerOps extends LazyLogging {
     }
   }
 
-  def updateMobileStatus(p: UpdateMobileStatusPacket): World.State = World.modify { w =>
+  def updateMobileStatus(p: x2D_UpdateMobileStatusPacket): World.State = World.modify { w =>
     w.mobiles.get(p.serial) match {
       case None =>
         logger.warn(s"mobile ${p.serial} not found for ${p.getClass.getSimpleName} update")
@@ -100,7 +102,7 @@ trait MobileHandlerOps extends LazyLogging {
     }
   }
 
-  def wearItemByMobile(p: WearItemByMobilePacket): World.State = World.modify { w =>
+  def wearItemByMobile(p: x2E_WearItemByMobilePacket): World.State = World.modify { w =>
     w.mobiles.get(p.mobileSerial) match {
       case None =>
         logger.warn(s"mobile ${p.mobileSerial} not found for ${p.getClass.getSimpleName} update")
@@ -112,14 +114,14 @@ trait MobileHandlerOps extends LazyLogging {
     }
   }
 
-  def warMode(p: WarModePacket): World.State = World.modify { w =>
+  def warMode(p: x72_WarModePacket): World.State = World.modify { w =>
     w.mobiles.get(w.playerSerial) match {
       case Some(player) => w.copy(mobiles = w.mobiles.updated(player.serial, player.copy(warMode = p.mode == 1)))
       case None => w
     }
   }
 
-  def updateMobile(p: UpdateMobilePacket): World.State = World.modify { w =>
+  def updateMobile(p: x77_UpdateMobilePacket): World.State = World.modify { w =>
     w.mobiles.get(p.serial) match {
       case Some(mobile) =>
         val newMobile = mobile.copy(bodyId = p.bodyId, x = p.x, y = p.y, z = p.z, direction = p.direction, hue = p.hue, flags = p.flags)
@@ -130,14 +132,14 @@ trait MobileHandlerOps extends LazyLogging {
     }
   }
 
-  def deleteMobile(p: DeletePacket): World.State = World.modify { w =>
+  def deleteMobile(p: x1D_DeletePacket): World.State = World.modify { w =>
     w.mobiles.get(p.serial) match {
       case Some(m) => w.copy(mobiles = w.mobiles - p.serial, item2mobile = w.item2mobile -- m.items.keys)
       case None => w
     }
   }
 
-  def itemRevision(p: ItemRevisionHashPacket): World.State = World.modify { w =>
+  def itemRevision(p: xDC_ItemRevisionHashPacket): World.State = World.modify { w =>
     val worldOpt: Option[World] = for {
       mid <- w.item2mobile.get(p.serial)
       mobile <- w.mobiles.get(mid)
@@ -147,5 +149,9 @@ trait MobileHandlerOps extends LazyLogging {
     }
 
     worldOpt.getOrElse(w)
+  }
+
+  def setMap(p: xBF_8_SetMapPacket): World.State = World.modify { w =>
+    w.copy(mapId = p.mapId)
   }
 }

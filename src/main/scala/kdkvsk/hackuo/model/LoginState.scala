@@ -14,7 +14,7 @@ case class LoginState(username: String,
                       clientVersion: ClientVersion,
                       serverName: String,
                       characterName: String,
-                      clientFlag: ClientFlag.Type,
+                      clientFlag: Int,
                       loginCount: Int,
                       featuresFlag: Int = 0,
                       loggedIn: Boolean = false)
