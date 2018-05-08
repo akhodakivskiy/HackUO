@@ -7,6 +7,6 @@ sealed trait Message
 object StartupMessage extends Message
 object ShutdownMessage extends Message
 
-trait HandlerMessage extends Message
+trait InputMessage extends Message
 
 case class PacketMessage(packet: RecvPacket) extends Message

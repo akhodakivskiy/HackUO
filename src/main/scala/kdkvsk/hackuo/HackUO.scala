@@ -9,12 +9,12 @@ import com.typesafe.scalalogging.LazyLogging
 import kdkvsk.hackuo.client._
 import kdkvsk.hackuo.client.compression.HuffmanCompression
 import kdkvsk.hackuo.client.crytpo.{GameCrypto, LoginCrypto}
-import kdkvsk.hackuo.handler._
 import kdkvsk.hackuo.model.common.{ClientFlag, ClientVersion}
-import kdkvsk.hackuo.model.{LoginState, World}
+import kdkvsk.hackuo.model.World
 import kdkvsk.hackuo.network.PacketManager
 import kdkvsk.hackuo.network.packets.recv._
 import kdkvsk.hackuo.network.packets.send._
+import kdkvsk.hackuo.model.composition.LoginData
 import scopt.{OptionParser, Read}
 
 import scala.concurrent.ExecutionContext
@@ -31,7 +31,7 @@ object HackUO {
                     clientLanguage: String = "enu",
                     serverName: String = null,
                     characterName: String = null,
-                    clientFlagOpt: Option[Int] = None,
+                    clientFlagOpt: Option[ClientFlag.ValueSet] = None,
                     loginCount: Int = 0,
                     isEncrypted: Boolean = false) {
     val loginServerOpt: Option[(InetAddress, Int)] = {
@@ -45,10 +45,11 @@ object HackUO {
   }
 
   import ClientVersion.clientVersionReader
+  import ClientFlag.clientFlagReader
 
   implicit var pathReader: Read[Path] = Read.reads(s => Paths.get(s))
 
-  val parser = new OptionParser[Config](this.getClass.getSimpleName) {
+  val parser: OptionParser[Config] = new OptionParser[Config](this.getClass.getSimpleName) {
     opt[Path]("client-dir").required().text("path to the folder with UO client files").action((v, c) => c.copy(clientDir = v))
     opt[ClientVersion]("client-version").required().text("emulated client version").action((v, c) => c.copy(clientVersion = v))
     opt[String]("username").required().text("account username").action((v, c) => c.copy(username = v))
@@ -58,7 +59,7 @@ object HackUO {
     opt[String]("host").optional().text("server host name").action((v, c) => c.copy(hostOpt = Some(InetAddress.getByName(v))))
     opt[Int]("port").optional().text("server port").action((v, c) => c.copy(portOpt = Some(v)))
     opt[String]("client-language").optional().text("client language for cliloc").action((v, c) => c.copy(clientLanguage = v))
-    opt[Int]("client-flag").optional().text(s"client flag indicating uo version").action((v, c) => c.copy(clientFlagOpt = Some(v)))
+    opt[ClientFlag.ValueSet]("client-flag").optional().text(s"client flag indicating uo version").action((v, c) => c.copy(clientFlagOpt = Some(v)))
     opt[Int]("login-count").optional().text("login count (defaults to 0)").action((v, c) => c.copy(loginCount = v))
     opt[Unit]("encrypted").optional().text("OSI server encryption on").action((v, c) => c.copy(isEncrypted = true))
   }
@@ -89,17 +90,15 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
       pm.setCrypto(new GameCrypto(authId))
     }
 
-    val loginState: LoginState = LoginState(config.username, config.password,
+    val loginState: LoginData = LoginData(config.username, config.password,
       clientIp, serverIp, serverPort, authId, config.clientVersion, serverName, config.characterName,
-      config.clientFlagOpt.getOrElse(ClientFlag.Latest.toBitMask.head.toInt), config.loginCount)
+      config.clientFlagOpt.getOrElse(ClientFlag.Latest), config.loginCount)
 
-    val world: World = World(client, login = loginState)
-
-    val handler: MultiHandler = MultiHandler(MovementHandler :: ItemHandler :: ContainerHandler :: MobileHandler :: LoginHandler :: InteractionHandler :: REPLHandler :: Nil)
+    val world: World = World.empty(client, loginState)
 
     startReadingPackets(pm)
 
-    startProcessingPackets(pm, world, handler)
+    startProcessingPackets(pm, world)
 
     val authIdBuffer: ByteBuffer = ByteBuffer.allocate(4)
     authIdBuffer.putInt(authId)
@@ -109,7 +108,7 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
 
     while (!socket.isClosed) {
       val command: String = StdIn.readLine("> ")
-      messageQueue.put(REPLMessage(command.split(" ").filter(_.nonEmpty).toList))
+      messageQueue.put(REPLInput(command.split(" ").filter(_.nonEmpty).toList))
     }
 
     socket.close()
@@ -125,10 +124,11 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
         logger.info(s"terminating due to: $reason")
         System.exit(0)
       case NoopResponse =>
+      case EventResponse(e) =>
     }
   }
 
-  def startProcessingPackets(packetManager: PacketManager, worldInit: World, handler: Handler): Unit = {
+  def startProcessingPackets(packetManager: PacketManager, worldInit: World): Unit = {
     ExecutionContext.Implicits.global.execute(new Runnable {
       private var world: World = worldInit
       private var continue: Boolean = true
@@ -137,11 +137,13 @@ class HackUO(config: HackUO.Config) extends LazyLogging {
         while (continue) {
           val message: Message = messageQueue.take()
 
-          val (newWorld, response) = handler.handle(message).run(world).value
+          if (World.handler.isDefinedAt(message)) {
+            val (newWorld, response) = World.handler(message).run(world).value
 
-          handleResponse(response, packetManager)
+            handleResponse(response, packetManager)
 
-          world = newWorld
+            world = newWorld
+          }
 
           if (message == ShutdownMessage) {
             continue = false

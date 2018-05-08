@@ -4,6 +4,7 @@ import java.net.InetAddress
 import java.nio.file.{Files, Path}
 
 import com.typesafe.scalalogging.LazyLogging
+import kdkvsk.hackuo.lib.IntValue
 
 import scala.collection.JavaConverters._
 

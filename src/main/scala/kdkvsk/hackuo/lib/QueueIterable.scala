@@ -1,4 +1,4 @@
-package kdkvsk.hackuo.client
+package kdkvsk.hackuo.lib
 
 import java.util.concurrent.ArrayBlockingQueue
 

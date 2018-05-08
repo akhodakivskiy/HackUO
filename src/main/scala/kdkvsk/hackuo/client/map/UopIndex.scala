@@ -23,7 +23,7 @@ case class UopIndex(path: Path, fileSize: Int, version: Int, entries: SortedMap[
 }
 
 object UopIndex extends LazyLogging {
-  import kdkvsk.hackuo.client.DataInputUtils.DataInputOps
+  import kdkvsk.hackuo.lib.DataInputUtils.DataInputOps
 
   def load(path: Path): UopIndex = {
     logger.info(s"loading UOP index file from $path")

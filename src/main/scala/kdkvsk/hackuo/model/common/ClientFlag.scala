@@ -1,5 +1,8 @@
 package kdkvsk.hackuo.model.common
 
+import kdkvsk.hackuo.lib.LongValue
+import scopt.Read
+
 object ClientFlag extends Enumeration {
   type Type = Value
 
@@ -15,6 +18,13 @@ object ClientFlag extends Enumeration {
   val Reserved: Value = Value(7, "reserved")
   val Client3D: Value = Value(8, "3d")
 
-  val Latest: ValueSet = Renaissance + ThirdDawn + Lbr + Aos + Se + Sa
+  val Latest: ValueSet = ValueSet(Renaissance, ThirdDawn, Lbr, Aos, Se, Sa)
+
+  implicit val clientFlagReader: Read[ValueSet] = Read.reads {
+    case "latest" => Latest
+    case s if values.exists(_.toString == s) => ValueSet(withName(s))
+    case LongValue(l) => ValueSet.fromBitMask(Array(l))
+    case _ => throw new IllegalArgumentException(s"expected ClientType: ${values.map(_.toString).mkString(", ")} or 'latest', or numeric flag value")
+  }
 }
 

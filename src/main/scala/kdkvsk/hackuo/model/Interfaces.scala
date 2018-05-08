@@ -8,12 +8,20 @@ trait Point2D {
 }
 
 object Point2D {
+  def isSame(pts: (Point2D, Point2D)): Boolean = {
+    isSame(pts._1, pts._2)
+  }
+
   def isSame(p1: Point2D, p2: Point2D): Boolean = {
     p1.x == p2.x && p1.y == p2.y
   }
 
   def isSame(p1: Point2D, x: Int, y: Int): Boolean = {
     p1.x == x && p1.y == y
+  }
+
+  def direction(pts: (Point2D, Point2D)): Direction.Type = {
+    direction(pts._1, pts._2)
   }
 
   def direction(from: Point2D, to: Point2D): Direction.Type = {

@@ -1,6 +1,6 @@
 package kdkvsk.hackuo.model.common
 
-import kdkvsk.hackuo.client.IntValue
+import kdkvsk.hackuo.lib.IntValue
 import scopt.Read
 
 case class ClientVersion(major: Int, minor: Int, revision: Int, patch: Int) {

@@ -12,7 +12,7 @@ case class LandTile(id: Int, z: Int)
 case class StaticTile(id: Int, z: Int, hue: Int)
 
 class TileMatrix(val fileIndex: Int, width: Int, height: Int, mapPath: Path, withMapIndex: Boolean, staticIndexPath: Path, staticPath: Path) extends LazyLogging {
-  import kdkvsk.hackuo.client.DataInputUtils.DataInputOps
+  import kdkvsk.hackuo.lib.DataInputUtils.DataInputOps
 
   val blockWidth: Int = width >>> 3
   val blockHeight: Int = height >>> 3

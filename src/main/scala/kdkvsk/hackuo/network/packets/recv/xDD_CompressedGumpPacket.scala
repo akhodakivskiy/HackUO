@@ -4,7 +4,7 @@ import java.io.{ByteArrayInputStream, DataInputStream}
 import java.nio.charset.StandardCharsets
 import java.util.zip.InflaterInputStream
 
-import kdkvsk.hackuo.client.IntValue
+import kdkvsk.hackuo.lib.IntValue
 import kdkvsk.hackuo.model._
 import kdkvsk.hackuo.model.common._
 import kdkvsk.hackuo.network.{RecvPacket, RecvPacketParser}

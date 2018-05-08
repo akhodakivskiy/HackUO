@@ -19,7 +19,7 @@ case class Cliloc(entries: Map[Int, ClilocEntry]) {
 }
 
 object Cliloc extends LazyLogging {
-  import DataInputUtils.DataInputOps
+  import kdkvsk.hackuo.lib.DataInputUtils.DataInputOps
 
   def substitute(textId: Int, text: String, args: String): String = {
     args.split('\t').filter(_.nonEmpty).foldLeft(text) {
